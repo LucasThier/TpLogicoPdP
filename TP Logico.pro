@@ -22,6 +22,17 @@ peso(pumba, 100).
 peso(timon, 50). 
 peso(simba, 200). 
 
+persigue(scar, timon).
+persigue(scar, pumba).
+persigue(shenzi, simba).
+persigue(shenzi, scar).
+persigue(banzai, timon).
+comio(shenzi, hormiga(conCaraDeSimba)).
+persigue(scar, mufasa).
+
+peso(scar, 300).
+peso(shenzi, 400).
+peso(banzai, 500).
 
 % 1) A falta de pochoclos...
 % a) ¿Qué cucaracha es jugosita?
@@ -45,39 +56,53 @@ cucarachofobico(Personaje) :-
 picarones(ListaPicarones) :-
     findall(Personaje, esPicaron(Personaje), ListaPicarones).
 
-esPicaron(pumba) :-
-    comio(pumba, _).
+esPicaron(pumba).
 esPicaron(Personaje) :-
-    comio(Personaje, cucaracha(_, _, _)),
-    jugosita(cucaracha(_, _, _)).
+    comio(Personaje, Cucaracha),
+    Cucaracha = cucaracha(_, _, _),
+    jugosita(Cucaracha).
 esPicaron(Personaje) :-
     comio(Personaje, vaquitaSanAntonio(remeditos, _)).
 
 % 2) Pero yo quiero carne...
 % a) ¿Cuánto engorda un personaje?
 cuantoEngorda(Personaje, PesoTotal) :-
-    comio(Personaje, Bicho),
-    calcularPeso(Bicho, PesoTotal).
+    peso(Personaje, PesoOriginal),
+    findall(PesoComida, pesoComida(Personaje, PesoComida), PesosComida),
+    sum_list(PesosComida, PesoComidas),
+    PesoTotal is PesoOriginal + PesoComidas.
 
-calcularPeso(hormiga(_), 2).
-calcularPeso(cucaracha(_, _, _), 0).
-calcularPeso(vaquitaSanAntonio(_, Peso), Peso).
+pesoComida(Personaje, PesoComida) :-
+    comio(Personaje, Comida),
+    pesoDeComida(Comida, PesoComida).
+
+pesoDeComida(hormiga(_), 2).
+pesoDeComida(cucaracha(_, _, Peso), Peso).
+pesoDeComida(vaquitaSanAntonio(_, Peso), Peso).
 
 % b) Cuanto engorda un personaje, considerando a los perseguidos.
 cuantoEngordaConPerseguidos(Personaje, PesoTotal) :-
-    comio(Personaje, Bicho),
-    calcularPeso(Bicho, PesoTotalBicho),
-    findall(PesoPerseguido, (persigue(Personaje, Perseguido), peso(Perseguido, PesoPerseguido)), PesosPerseguidos),
-    sum_list(PesosPerseguidos, PesoTotalPerseguidos),
-    PesoTotal is PesoTotalBicho + PesoTotalPerseguidos.
+    peso(Personaje, PesoOriginal),
+    findall(PesoComida, pesoComida(Personaje, PesoComida), PesosComida),
+    findall(PesoPerseguido, pesoPerseguido(Personaje, PesoPerseguido), PesosPerseguidos),
+    append(PesosComida, PesosPerseguidos, PesosTotales),
+    sum_list(PesosTotales, PesoTotal).
+
+pesoPerseguido(Personaje, PesoPerseguido) :-
+    persigue(Personaje, Victima),
+    peso(Victima, PesoPerseguido).
 
 % c) Cuánto engorda un personaje, considerando lo comido por las víctimas.
-cuantoEngordaConVictimas(Personaje, PesoTotal) :-
-    comio(Personaje, Bicho),
-    calcularPeso(Bicho, PesoTotalBicho),
-    findall(PesoVictima, (persigue(Victima, Personaje), cuantoEngordaConVictimas(Victima, PesoVictima)), PesosVictimas),
-    sum_list(PesosVictimas, PesoTotalVictimas),
-    PesoTotal is PesoTotalBicho + PesoTotalVictimas.
+cuantoEngordaConComida(Personaje, PesoTotal) :-
+    peso(Personaje, PesoOriginal),
+    findall(PesoComida, pesoComida(Personaje, PesoComida), PesosComida),
+    findall(PesoPerseguido, pesoPerseguido(Personaje, PesoPerseguido), PesosPerseguidos),
+    append(PesosComida, PesosPerseguidos, PesosTotales),
+    sum_list(PesosTotales, PesoTotal).
+
+pesoPerseguido(Personaje, PesoPerseguido) :-
+    persigue(Personaje, Victima),
+    cuantoEngorda(Victima, PesoPerseguido).
 
 % 3) Combinaciones posibles de comidas de un personaje.
 combinaComidas(Personaje, ListaComidas) :-
@@ -87,18 +112,18 @@ combinaComidas(Personaje, ListaComidas) :-
 rey(R) :-
     persigue(Persigue, R),
     not((persigue(OtroPersigue, R), OtroPersigue \= Persigue)),
-    forall(adoran(Animal, R), Animal \= Persigue).
+    forall(adoran(Animal, R), Animal \= R).
 
 adoran(Animal, R) :-
-    not(persigue(Animal, R)),
-    not(comio(Animal, R)).
+    not(persigue(R, Animal)),
+    not(comio(R, Animal)).
 
 % 5) Explicar en dónde se usaron y cómo fueron de utilidad los siguientes conceptos:
-% a. Polimorfismo: Se utiliza polimorfismo al definir los predicados calcularPeso/2 y cuantoEngordaConVictimas/2.
+% a. Polimorfismo: Se utiliza polimorfismo al definir los predicados calcularPeso y cuantoEngordaConVictimas.
 %    Estos predicados pueden manejar diferentes tipos de bichos (hormigas, cucarachas, vaquitas) y calcular sus pesos
 %    correctamente según el tipo. Esto hace que los predicados sean más genéricos y reutilizables.
 
-% b. Recursividad: La recursividad se utiliza en el predicado cuantoEngordaConVictimas/2, donde se calcula el peso
+% b. Recursividad: La recursividad se utiliza en el predicado cuantoEngordaConVictimas, donde se calcula el peso
 %    de un personaje considerando el peso de sus víctimas y las víctimas de sus víctimas, de manera recursiva.
 
 % c. Inversibilidad: Los predicados definidos son inversibles, lo que significa que se pueden usar en ambos sentidos
